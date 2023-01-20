@@ -1,7 +1,10 @@
 #! /usr/bin/perl -w
 #
-# SameFiles.pl  v1.06    3 II 2011  by Tomasz Pierzchala
+# SameFiles.pl  v1.07    20 I 2023  by Tomasz Pierzchala
 #
+# in 1.07 -  20I 2023: The found path are sorted - easier to find a pattern.
+#					   To do this $upper path is added to the %SameFiles{$upper}
+#					   array, which is finally sorted.
 #
 # in 1.06 -  3II 2011: Warning if exists are written at the and of the 
 #                      report file
@@ -82,18 +85,23 @@ foreach(sort { $b <=> $a } keys %files){
 	while(scalar keys %already_compared > 1 ){
 	    foreach my $upper (keys %already_compared){
 #
-		delete $already_compared{$upper};
-		foreach my $lower (keys %already_compared){
-		    my $ifsame = &are_same($upper,$lower);
-		    if($ifsame == 1){
-			delete $already_compared{$lower};
-			push( @{$SameFiles{$upper}}, $lower);
-		    }elsif($ifsame == -1){
-			last;
-		    }elsif($ifsame == -2){
-			delete $already_compared{$lower};
-		    }
-		}#end foreach $lower
+			delete $already_compared{$upper};
+			my @paths;
+			foreach my $lower (keys %already_compared){
+			    my $ifsame = &are_same($upper,$lower);
+			    if($ifsame == 1){
+					delete $already_compared{$lower};
+					push(@paths, $lower);
+			    }elsif($ifsame == -1){
+					last;
+			    }elsif($ifsame == -2){
+					delete $already_compared{$lower};
+			    }
+			}#end foreach $lower
+			if($#paths > -1 ){
+				# add upper file to list of found same files if any found
+				$SameFiles{$upper} = [ @paths[0..$#paths], $upper];
+			}	
 	    }#end foreach $upper
 	}#end while loop
 #
@@ -121,10 +129,10 @@ open REPORT,">", "$results" or die "Error with open file $results\nSys: $!\n";
 select REPORT;
 print "\nIn directory : ",abs_path($ARGV[0]),"\n";
 foreach(sort {(-s $a) <=> (-s $b)} keys %SameFiles){
-    print "\nFollowing files of a size ",(-s $_)," B are same :\n$_\n";
-    foreach my $filename ( @{$SameFiles{$_}} )
+    print "\nFollowing files of a size ",(-s $_)," B are same :\n";
+    foreach ( sort {lc($a) cmp lc($b) } @{$SameFiles{$_}} )
     {
-	print "$filename\n";
+		print "$_\n";
     }
 }
 my $time1 = time;
